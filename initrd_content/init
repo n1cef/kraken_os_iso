@@ -1,0 +1,86 @@
+#!/bin/sh
+
+echo "Booting Kraken OS..."
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev
+
+# --------------------------------------------------
+# Mount ISO Device
+# --------------------------------------------------
+echo "Mounting ISO device..."
+ISO_DEVICE="/dev/sr0"
+mkdir -p /mnt/iso /mnt/live || { echo "mkdir failed"; exec /bin/sh; }
+mount -t iso9660 -o ro "$ISO_DEVICE" /mnt/iso || { echo "ISO mount failed"; exec /bin/sh; }
+
+# --------------------------------------------------
+# Mount root.sfs
+# --------------------------------------------------
+echo "Mounting SquashFS root filesystem..."
+mount -t squashfs -o loop /mnt/iso/root.sfs /mnt/live || { echo "SquashFS mount failed"; exec /bin/sh; }
+
+# --------------------------------------------------
+# RAM Mode Handling (Improved)
+# --------------------------------------------------
+for x in $(cat /proc/cmdline); do
+    case $x in
+        ram)
+            echo "RAM Mode: Copying rootfs to memory..."
+            
+            # Setup tmpfs and logging
+            mkdir -p /tmp
+            mount -t tmpfs tmpfs /tmp || { echo "Failed to mount /tmp"; exec /bin/sh; }
+            mkdir -p /mnt/ram
+            mount -t tmpfs -o size=12G tmpfs /mnt/ram || { echo "tmpfs mount failed"; exec /bin/sh; }
+            
+            # Copy files with verbose output
+            echo "Copying files (verbose output)..."
+            (cd /mnt/live && tar cvf - .) | (cd /mnt/ram && tar xvf - 2>&1 | tee /tmp/tar.log) || {
+                echo "ERROR: Copy failed! Last 10 lines:"
+                tail -n 10 /tmp/tar.log
+                echo "Disk usage:"
+                df -h /mnt/ram
+                exec /bin/sh
+            }
+            
+            # Unmount the original root.sfs and ISO
+            umount /mnt/live || { echo "Failed to unmount /mnt/live"; exec /bin/sh; }
+            umount /mnt/iso || { echo "Failed to unmount ISO"; exec /bin/sh; }  # Unmount here in RAM mode
+            
+            # Switch to RAM copy
+            mount -o bind /mnt/ram /mnt/live || { echo "Bind mount failed"; exec /bin/sh; }
+            ;;
+    esac
+done
+
+# --------------------------------------------------
+# Prepare RootFS
+# --------------------------------------------------
+mkdir -p /mnt/rootfs || { echo "mkdir /mnt/rootfs failed"; exec /bin/sh; }
+
+# Directly bind mount the root filesystem (RAM or original)
+mount -o bind /mnt/live /mnt/rootfs || { echo "RootFS bind mount failed"; exec /bin/sh; }
+
+# Create essential directories
+mkdir -p /mnt/rootfs/proc /mnt/rootfs/sys /mnt/rootfs/dev || { echo "mkdir rootfs dirs failed"; exec /bin/sh; }
+
+# --------------------------------------------------
+# Cleanup ISO Mount (Removed! Only done in RAM mode)
+# --------------------------------------------------
+
+# --------------------------------------------------
+# Switch Root
+# --------------------------------------------------
+echo "Switching root filesystem..."
+cd /mnt/rootfs || { echo "cd failed"; exec /bin/sh; }
+
+if [ ! -x sbin/init ]; then
+    echo "ERROR: /sbin/init missing or not executable!"
+    exec /bin/sh
+fi
+
+mount --move /proc /mnt/rootfs/proc || { echo "Move proc failed"; exec /bin/sh; }
+mount --move /sys /mnt/rootfs/sys || { echo "Move sys failed"; exec /bin/sh; }
+mount --move /dev /mnt/rootfs/dev || { echo "Move dev failed"; exec /bin/sh; }
+
+exec switch_root /mnt/rootfs /sbin/init
