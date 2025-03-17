@@ -57,7 +57,7 @@ done
 # Prepare RootFS
 # --------------------------------------------------
 mkdir -p /mnt/rootfs || { echo "mkdir /mnt/rootfs failed"; exec /bin/sh; }
-
+mkdir -p /mnt/rootfs/{home,tmp,run,var/run,var/log} || { echo "mkdir writable dirs failed"; exec /bin/sh; }
 # Directly bind mount the root filesystem (RAM or original)
 mount -o bind /mnt/live /mnt/rootfs || { echo "RootFS bind mount failed"; exec /bin/sh; }
 
@@ -65,8 +65,33 @@ mount -o bind /mnt/live /mnt/rootfs || { echo "RootFS bind mount failed"; exec /
 mkdir -p /mnt/rootfs/proc /mnt/rootfs/sys /mnt/rootfs/dev || { echo "mkdir rootfs dirs failed"; exec /bin/sh; }
 
 # --------------------------------------------------
-# Cleanup ISO Mount (Removed! Only done in RAM mode)
+# mount writable tmpfs directories 
 # --------------------------------------------------
+echo "Creating writable directories with tmpfs..."
+
+mount -t tmpfs tmpfs /mnt/rootfs/tmp || { echo "tmpfs for /tmp failed"; exec /bin/sh; }
+mount -t tmpfs tmpfs /mnt/rootfs/run || { echo "tmpfs for /run failed"; exec /bin/sh; }
+mount -t tmpfs tmpfs /mnt/rootfs/var/run || { echo "tmpfs for /var/run failed"; exec /bin/sh; }
+#mount -t tmpfs tmpfs /mnt/rootfs/var/lock || { echo "tmpfs for /var/lock failed"; exec /bin/sh; }
+mount -t tmpfs tmpfs /mnt/rootfs/var/log || { echo "tmpfs for /var/log failed"; exec /bin/sh; }
+
+# NEW: Mount /home as tmpfs and copy data
+mount -t tmpfs tmpfs /mnt/rootfs/home || { echo "tmpfs for /home failed"; exec /bin/sh; }
+mkdir -p /mnt/rootfs/home/pfe
+mkdir -p /mnt/rootfs/home/cracken
+cp -a /mnt/live/home/pfe/* /mnt/rootfs/home/pfe/ 2>/dev/null || echo "No home data copied for pfe ."
+cp -a /mnt/live/home/cracken/* /mnt/rootfs/home/cracken/ 2>/dev/null || echo "No home data copied for cracken"
+
+# Set permissions (adjust as needed)
+chmod 1777 /mnt/rootfs/tmp
+chmod 755 /mnt/rootfs/var/log
+chmod 755 /mnt/rootfs/home
+chown -R 1001:1001 /mnt/rootfs/home/pfe
+chown -R 1002:1002 /mnt/rootfs/home/cracken
+# Create /dev/pts (for pseudo-terminals)
+mkdir -p /mnt/rootfs/dev/pts
+mount -t devpts devpts /mnt/rootfs/dev/pts || { echo "devpts mount failed"; exec /bin/sh; }
+
 
 # --------------------------------------------------
 # Switch Root
