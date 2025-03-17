@@ -1,0 +1,5 @@
+sudo find . | cpio -ov -H newc | gzip -9 > /home/nacef/initrd3.img
+
+sudo mkisofs -V "KRAKEN_OS"   -o /home/nacef/kraken1-os.iso   -b boot/isolinux/isolinux.bin   -c boot/isolinux/boot.cat   -no-emul-boot   -boot-load-size 4   -boot-info-table   -iso-level 3   -R -J   iso2
+
+sudo mksquashfs rootfs/ root.sfs -comp xz -b 1M -noappend -all-root -Xdict-size 1M -Xbcj x86
