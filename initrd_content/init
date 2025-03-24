@@ -20,7 +20,7 @@ echo "Mounting SquashFS root filesystem..."
 mount -t squashfs -o loop /mnt/iso/root.sfs /mnt/live || { echo "SquashFS mount failed"; exec /bin/sh; }
 
 # --------------------------------------------------
-# RAM Mode Handling (Improved)
+# RAM Mode Handling 
 # --------------------------------------------------
 for x in $(cat /proc/cmdline); do
     case $x in
@@ -33,7 +33,7 @@ for x in $(cat /proc/cmdline); do
             mkdir -p /mnt/ram
             mount -t tmpfs -o size=12G tmpfs /mnt/ram || { echo "tmpfs mount failed"; exec /bin/sh; }
             
-            # Copy files with verbose output
+            # Copy files 
             echo "Copying files (verbose output)..."
             (cd /mnt/live && tar cvf - .) | (cd /mnt/ram && tar xvf - 2>&1 | tee /tmp/tar.log) || {
                 echo "ERROR: Copy failed! Last 10 lines:"
@@ -58,7 +58,7 @@ done
 # --------------------------------------------------
 mkdir -p /mnt/rootfs || { echo "mkdir /mnt/rootfs failed"; exec /bin/sh; }
 mkdir -p /mnt/rootfs/{home,tmp,run,var/run,var/log} || { echo "mkdir writable dirs failed"; exec /bin/sh; }
-# Directly bind mount the root filesystem (RAM or original)
+# Directly bind mount the root filesystem 
 mount -o bind /mnt/live /mnt/rootfs || { echo "RootFS bind mount failed"; exec /bin/sh; }
 
 # Create essential directories
@@ -75,14 +75,14 @@ mount -t tmpfs tmpfs /mnt/rootfs/var/run || { echo "tmpfs for /var/run failed"; 
 #mount -t tmpfs tmpfs /mnt/rootfs/var/lock || { echo "tmpfs for /var/lock failed"; exec /bin/sh; }
 mount -t tmpfs tmpfs /mnt/rootfs/var/log || { echo "tmpfs for /var/log failed"; exec /bin/sh; }
 
-# NEW: Mount /home as tmpfs and copy data
+#  Mount /home as tmpfs and copy data
 mount -t tmpfs tmpfs /mnt/rootfs/home || { echo "tmpfs for /home failed"; exec /bin/sh; }
 mkdir -p /mnt/rootfs/home/pfe
 mkdir -p /mnt/rootfs/home/cracken
 cp -a /mnt/live/home/pfe/* /mnt/rootfs/home/pfe/ 2>/dev/null || echo "No home data copied for pfe ."
 cp -a /mnt/live/home/cracken/* /mnt/rootfs/home/cracken/ 2>/dev/null || echo "No home data copied for cracken"
 
-# Set permissions (adjust as needed)
+# Set permissions 
 chmod 1777 /mnt/rootfs/tmp
 chmod 755 /mnt/rootfs/var/log
 chmod 755 /mnt/rootfs/home
